@@ -1,0 +1,13 @@
+node_modules/**
+dist/** 
+dist-tarballs/**
+.env
+.DS_Store
+.vscode/
+coverage/
+npm-debug.log*
+yarn-error.log*
+.idea/
+*.log
+*.swp
+*.swo
