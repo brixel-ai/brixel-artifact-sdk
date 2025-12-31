@@ -35,7 +35,7 @@ function getApiBaseUrl(): string {
  *
  * @example
  * ```tsx
- * import { executeTask } from "@brixel/ui-task-sdk";
+ * import { executeTask } from "@brixel/artifact-sdk";
  *
  * // Recommended: Use token from context (passed by parent via postMessage)
  * const result = await executeTask({
@@ -45,14 +45,14 @@ function getApiBaseUrl(): string {
  * });
  *
  * // Or let the hook bind it automatically
- * const { executeTask } = useBrixelTask();
+ * const { executeTask } = useBrixelArtifact();
  * const result = await executeTask({
  *   taskUuid: "task-123-456",
  *   inputs: { name: "John", email: "john@example.com" },
  * });
  *
  * if (result.success) {
- *   console.log("Task executed:", result.data);
+ *   console.debug("Task executed:", result.data);
  * } else {
  *   console.error("Error:", result.error);
  * }
@@ -70,8 +70,11 @@ export async function executeTask<TOutput = unknown>(
   const baseUrl = apiBaseUrl || getApiBaseUrl();
 
   // Log the API URL in development
-  if (typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+  if (
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ) {
+    console.debug("[Brixel SDK] Using API URL:", baseUrl);
   }
 
   try {
@@ -102,23 +105,31 @@ export async function executeTask<TOutput = unknown>(
       }),
     });
 
-    // Parse response
-    const data = await response.json();
+    // Parse response (guard against empty or non-JSON bodies)
+    const responseText = await response.text();
+    let data: any = null;
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = { raw: responseText };
+      }
+    }
 
     if (!response.ok) {
       return {
         success: false,
         error: {
-          code: data.code || `HTTP_${response.status}`,
-          message: data.message || `Request failed with status ${response.status}`,
-          details: data.details || data,
+          code: data?.code || `HTTP_${response.status}`,
+          message: data?.message || `Request failed with status ${response.status}`,
+          details: data?.details || data,
         },
       };
     }
 
     return {
       success: true,
-      data: data as TOutput,
+      data: (data ?? undefined) as TOutput,
     };
   } catch (error) {
     return {
@@ -140,7 +151,7 @@ export async function executeTask<TOutput = unknown>(
  *
  * @example
  * ```tsx
- * const { context } = useBrixelTask();
+ * const { context } = useBrixelArtifact();
  * const boundExecuteTask = createExecuteTask({
  *   apiToken: context?.apiToken,
  *   conversationId: context?.conversationId
@@ -156,7 +167,7 @@ export async function executeTask<TOutput = unknown>(
  * @example
  * ```tsx
  * // Or use the executeTask from the hook directly (recommended)
- * const { executeTask } = useBrixelTask();
+ * const { executeTask } = useBrixelArtifact();
  *
  * const result = await executeTask({
  *   taskUuid: "task-123",

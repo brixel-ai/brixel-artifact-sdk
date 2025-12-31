@@ -12,22 +12,11 @@ import type { BrixelContext, RenderMode } from "./types";
 export const mockContext: BrixelContext = {
   runId: "dev-run-001",
   stepId: "dev-step-001",
-  user: {
-    id: "dev-user-001",
-    name: "Dev User",
-    email: "dev@example.com",
-  },
-  organization: {
-    id: "dev-org-001",
-    name: "Dev Organization",
-  },
+  userId: "dev-user-001",
+  organizationId: "dev-org-001",
   theme: "light",
   locale: "en-US",
-  capabilities: {
-    resize: true,
-    fullscreen: true,
-    fileUpload: false,
-  },
+  conversationId: "dev-conversation-001",
 };
 
 /**
@@ -62,7 +51,7 @@ export function simulateBrixelInit<TInputs = unknown>(
     payload: {
       runId,
       inputs,
-      context: { ...mockContext, ...context },
+      context: { ...mockContext, ...context, runId },
       renderMode,
     },
   };
@@ -70,7 +59,7 @@ export function simulateBrixelInit<TInputs = unknown>(
   // Delay to ensure the component has mounted and listeners are ready
   setTimeout(() => {
     window.postMessage(message, "*");
-    console.log("[BrixelDevTools] Simulated INIT message sent:", message);
+    console.debug("[BrixelDevTools] Simulated INIT message sent:", message);
   }, delay);
 }
 
@@ -81,7 +70,7 @@ export function simulateBrixelInit<TInputs = unknown>(
  * ```tsx
  * useEffect(() => {
  *   const cleanup = listenToUITaskMessages((message) => {
- *     console.log("UI Task sent:", message);
+ *     console.debug("Artifact sent:", message);
  *   });
  *   return cleanup;
  * }, []);
@@ -110,8 +99,8 @@ export function listenToUITaskMessages(
  * @example
  * ```tsx
  * const host = createMockBrixelHost({
- *   onComplete: (output) => console.log("Completed:", output),
- *   onCancel: (reason) => console.log("Cancelled:", reason),
+ *   onComplete: (output) => console.debug("Completed:", output),
+ *   onCancel: (reason) => console.debug("Cancelled:", reason),
  * });
  *
  * // Send init
@@ -172,7 +161,7 @@ export function createMockBrixelHost<TInputs = unknown, TOutput = unknown>(optio
           payload: {
             runId,
             inputs,
-            context: mockContext,
+            context: { ...mockContext, runId },
             renderMode,
           },
         },

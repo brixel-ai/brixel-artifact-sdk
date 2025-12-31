@@ -1,15 +1,15 @@
 /**
- * @brixel/ui-task-sdk
+ * @brixel/artifact-sdk
  *
- * SDK for building Brixel UI Tasks - interactive React components
+ * SDK for building Brixel Artifacts - interactive React components
  * that integrate seamlessly with Brixel workflows.
  *
  * @example
  * ```tsx
- * import { useBrixelTask } from "@brixel/ui-task-sdk";
+ * import { useBrixelArtifact } from "@brixel/artifact-sdk";
  *
  * function MyUITask() {
- *   const { inputs, complete, context } = useBrixelTask<MyInputs, MyOutput>();
+ *   const { inputs, complete, context } = useBrixelArtifact<MyInputs, MyOutput>();
  *
  *   if (!inputs) return <div>Loading...</div>;
  *
@@ -26,7 +26,7 @@
  */
 
 // Main hook
-export { useBrixelTask } from "./useBrixelTask";
+export { useBrixelArtifact } from "./useBrixelArtifact";
 
 // Execute Task API
 export { executeTask, createExecuteTask } from "./executeTask";
@@ -36,7 +36,7 @@ export type {
   // Core types
   RenderMode,
   BrixelContext,
-  UITaskManifest,
+  ArtifactManifest,
   TaskStatus,
   // Hook types
   UseBrixelTaskResult,

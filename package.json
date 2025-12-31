@@ -1,7 +1,7 @@
 {
-  "name": "@brixel/ui-task-sdk",
+  "name": "@brixel/artifact-sdk",
   "version": "1.0.0",
-  "description": "SDK for building Brixel UI Tasks - interactive React components that integrate with Brixel workflows",
+  "description": "SDK for building Brixel Artifacts - interactive React components that integrate with Brixel workflows",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -39,13 +39,16 @@
   },
   "devDependencies": {
     "@types/react": "^19.0.2",
+    "@typescript-eslint/eslint-plugin": "^8.51.0",
+    "@typescript-eslint/parser": "^8.51.0",
+    "eslint": "^9.39.2",
     "react": "^19.2.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"
   },
   "keywords": [
     "brixel",
-    "ui-task",
+    "artifact",
     "workflow",
     "react",
     "iframe",
@@ -55,6 +58,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/brixel-ai/ui-task-sdk"
+    "url": "https://github.com/brixel-ai/brixel-artifact-sdk"
   }
 }

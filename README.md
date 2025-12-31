@@ -1,21 +1,21 @@
-# @brixel/ui-task-sdk
+# @brixel/artifact-sdk
 
-SDK for building Brixel UI Tasks - interactive React components that integrate with Brixel workflows.
+SDK for building Brixel Artifacts - interactive React components that integrate with Brixel workflows.
 
 ## Installation
 
 ```bash
-npm install @brixel/ui-task-sdk
+npm install @brixel/artifact-sdk
 # or
-yarn add @brixel/ui-task-sdk
+yarn add @brixel/artifact-sdk
 # or
-pnpm add @brixel/ui-task-sdk
+pnpm add @brixel/artifact-sdk
 ```
 
 ## Quick Start
 
 ```tsx
-import { useBrixelTask } from "@brixel/ui-task-sdk";
+import { useBrixelArtifact } from "@brixel/artifact-sdk";
 
 // Define your input/output types
 interface Inputs {
@@ -28,7 +28,7 @@ interface Output {
 }
 
 function MyUITask() {
-  const { inputs, complete, cancel, context, status } = useBrixelTask<Inputs, Output>();
+  const { inputs, complete, cancel, context, status } = useBrixelArtifact<Inputs, Output>();
 
   // Loading state while waiting for INIT from host
   if (!inputs) {
@@ -51,7 +51,7 @@ function MyUITask() {
 
 ## API Reference
 
-### `useBrixelTask<TInputs, TOutput>(options?)`
+### `useBrixelArtifact<TInputs, TOutput>(options?)`
 
 Main hook for building UI Tasks.
 
@@ -60,7 +60,7 @@ Main hook for building UI Tasks.
 | Property | Type | Description |
 |----------|------|-------------|
 | `inputs` | `TInputs \| null` | Input data from the host |
-| `context` | `BrixelContext \| null` | Execution context (user, theme, locale, etc.) |
+| `context` | `BrixelContext \| null` | Execution context (run, theme, locale, etc.) |
 | `status` | `TaskStatus` | Current status: `"initializing"`, `"ready"`, `"completed"`, `"cancelled"`, `"error"` |
 | `renderMode` | `RenderMode \| null` | `"display"` or `"interaction"` |
 | `runId` | `string \| null` | Unique run identifier |
@@ -86,7 +86,7 @@ interface UseBrixelTaskOptions {
 Test your UI Task locally without Brixel:
 
 ```tsx
-import { simulateBrixelInit } from "@brixel/ui-task-sdk";
+import { simulateBrixelInit } from "@brixel/artifact-sdk";
 
 // In your main.tsx or App.tsx
 if (import.meta.env.DEV) {
@@ -100,12 +100,12 @@ if (import.meta.env.DEV) {
 ### Mock Host for Testing
 
 ```tsx
-import { createMockBrixelHost } from "@brixel/ui-task-sdk";
+import { createMockBrixelHost } from "@brixel/artifact-sdk";
 
 const host = createMockBrixelHost({
-  onComplete: (output) => console.log("Completed:", output),
-  onCancel: (reason) => console.log("Cancelled:", reason),
-  onResize: (height) => console.log("Resize:", height),
+  onComplete: (output) => console.debug("Completed:", output),
+  onCancel: (reason) => console.debug("Cancelled:", reason),
+  onResize: (height) => console.debug("Resize:", height),
 });
 
 // Send init
@@ -123,7 +123,7 @@ For UI Tasks that only show information without requiring user interaction:
 
 ```tsx
 function DisplayTask() {
-  const { inputs, context } = useBrixelTask<{ message: string }, void>();
+  const { inputs, context } = useBrixelArtifact<{ message: string }, void>();
 
   if (!inputs) return null;
 
@@ -137,7 +137,7 @@ For UI Tasks that require user input and block the workflow:
 
 ```tsx
 function InteractionTask() {
-  const { inputs, complete, cancel } = useBrixelTask<FormInputs, FormOutput>();
+  const { inputs, complete, cancel } = useBrixelArtifact<FormInputs, FormOutput>();
 
   const handleSubmit = (data: FormOutput) => {
     complete(data); // This unblocks the workflow
@@ -155,15 +155,13 @@ The `context` object provides information about the execution environment:
 interface BrixelContext {
   runId: string;
   stepId?: string;
-  user?: { id: string; name?: string; email?: string; avatarUrl?: string };
-  organization?: { id: string; name?: string };
+  userId?: string;
+  organizationId?: string;
   theme: "light" | "dark" | "system";
   locale: string;
-  capabilities: {
-    resize: boolean;
-    fullscreen: boolean;
-    fileUpload: boolean;
-  };
+  conversationId?: string;
+  apiToken?: string;
+  apiBaseUrl?: string;
 }
 ```
 
@@ -174,10 +172,10 @@ The SDK allows UI Tasks to execute other UI Tasks programmatically using the `ex
 ### Basic Usage
 
 ```tsx
-import { useBrixelTask } from "@brixel/ui-task-sdk";
+import { useBrixelArtifact } from "@brixel/artifact-sdk";
 
 function MyUITask() {
-  const { executeTask } = useBrixelTask();
+  const { executeTask } = useBrixelArtifact();
 
   const handleExecuteTask = async () => {
     const result = await executeTask({
@@ -186,7 +184,7 @@ function MyUITask() {
     });
 
     if (result.success) {
-      console.log("Task executed:", result.data);
+      console.debug("Task executed:", result.data);
     } else {
       console.error("Error:", result.error);
     }
@@ -225,7 +223,7 @@ iframe.contentWindow.postMessage({
 The UI Task automatically receives this token and uses it for `executeTask` calls:
 
 ```tsx
-const { executeTask, context } = useBrixelTask();
+const { executeTask, context } = useBrixelArtifact();
 
 // Token from context is automatically used
 await executeTask({
@@ -290,7 +288,7 @@ To avoid duplicating React in consuming apps, test the SDK as an npm tarball (sa
 npm run pack:local
 
 # in a consumer app (adjust version if needed)
-npm install ../brixel-ui-task-sdk/dist-tarballs/brixel-ui-task-sdk-1.0.0.tgz
+npm install ../brixel-artifact-sdk/dist-tarballs/brixel-artifact-sdk-1.0.0.tgz
 ```
 
 This keeps `node_modules` out of the package and prevents hook errors caused by multiple React copies. Prefer this over `npm link`.

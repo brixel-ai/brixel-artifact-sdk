@@ -24,27 +24,13 @@ export interface BrixelContext {
   runId: string;
   /** Step ID within the workflow (if part of a workflow) */
   stepId?: string;
-  /** User information */
-  user?: {
-    id: string;
-    name?: string;
-    email?: string;
-    avatarUrl?: string;
-  };
-  /** Organization information */
-  organization?: {
-    id: string;
-    name?: string;
-  };
+  /** User identifier */
+  userId?: string;
+  /** Organization identifier */
+  organizationId?: string;
   /** UI preferences */
   theme: "light" | "dark" | "system";
   locale: string;
-  /** Capabilities supported by the host */
-  capabilities: {
-    resize: boolean;
-    fullscreen: boolean;
-    fileUpload: boolean;
-  };
   /** Conversation ID for API calls (optional) */
   conversationId?: string;
   /** API token passed by parent for authenticated requests (recommended over cookies) */
@@ -54,9 +40,9 @@ export interface BrixelContext {
 }
 
 /**
- * UI Task manifest schema
+ * Artifact manifest schema
  */
-export interface UITaskManifest {
+export interface ArtifactManifest {
   id: string;
   version: string;
   type: "ui_component";

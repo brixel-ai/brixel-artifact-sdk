@@ -27,7 +27,7 @@ function isInIframe(): boolean {
  *
  * @example
  * ```tsx
- * import { useBrixelTask } from "@brixel/ui-task-sdk";
+ * import { useBrixelArtifact } from "@brixel/artifact-sdk";
  *
  * interface Inputs {
  *   title: string;
@@ -39,7 +39,7 @@ function isInIframe(): boolean {
  * }
  *
  * function MyUITask() {
- *   const { inputs, complete, cancel, context } = useBrixelTask<Inputs, Output>();
+ *   const { inputs, complete, cancel, context } = useBrixelArtifact<Inputs, Output>();
  *
  *   if (!inputs) return <div>Loading...</div>;
  *
@@ -57,7 +57,7 @@ function isInIframe(): boolean {
  * }
  * ```
  */
-export function useBrixelTask<TInputs = unknown, TOutput = unknown>(
+export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
   options: UseBrixelTaskOptions = {}
 ): UseBrixelTaskResult<TInputs, TOutput> {
   const { targetOrigin = "*", onInputsUpdate, onDestroy, debug = false } = options;
@@ -76,7 +76,7 @@ export function useBrixelTask<TInputs = unknown, TOutput = unknown>(
   const debugLog = useCallback(
     (message: string, data?: unknown) => {
       if (debug) {
-        console.log(`[BrixelSDK] ${message}`, data ?? "");
+        console.debug(`[BrixelSDK] ${message}`, data ?? "");
       }
     },
     [debug]
