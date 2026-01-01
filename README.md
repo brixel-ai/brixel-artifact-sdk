@@ -1,21 +1,21 @@
-# @brixel/artifact-sdk
+# @brixel_ai/artifact-sdk
 
 SDK for building Brixel Artifacts - interactive React components that integrate with Brixel workflows.
 
 ## Installation
 
 ```bash
-npm install @brixel/artifact-sdk
+npm install @brixel_ai/artifact-sdk
 # or
-yarn add @brixel/artifact-sdk
+yarn add @brixel_ai/artifact-sdk
 # or
-pnpm add @brixel/artifact-sdk
+pnpm add @brixel_ai/artifact-sdk
 ```
 
 ## Quick Start
 
 ```tsx
-import { useBrixelArtifact } from "@brixel/artifact-sdk";
+import { useBrixelArtifact } from "@brixel_ai/artifact-sdk";
 
 // Define your input/output types
 interface Inputs {
@@ -86,7 +86,7 @@ interface UseBrixelTaskOptions {
 Test your UI Task locally without Brixel:
 
 ```tsx
-import { simulateBrixelInit } from "@brixel/artifact-sdk";
+import { simulateBrixelInit } from "@brixel_ai/artifact-sdk";
 
 // In your main.tsx or App.tsx
 if (import.meta.env.DEV) {
@@ -100,7 +100,7 @@ if (import.meta.env.DEV) {
 ### Mock Host for Testing
 
 ```tsx
-import { createMockBrixelHost } from "@brixel/artifact-sdk";
+import { createMockBrixelHost } from "@brixel_ai/artifact-sdk";
 
 const host = createMockBrixelHost({
   onComplete: (output) => console.debug("Completed:", output),
@@ -172,7 +172,7 @@ The SDK allows UI Tasks to execute other UI Tasks programmatically using the `ex
 ### Basic Usage
 
 ```tsx
-import { useBrixelArtifact } from "@brixel/artifact-sdk";
+import { useBrixelArtifact } from "@brixel_ai/artifact-sdk";
 
 function MyUITask() {
   const { executeTask } = useBrixelArtifact();
