@@ -1,83 +1,40 @@
 import type { ExecuteTaskParams, ExecuteTaskResponse } from "./types";
+import {
+  debugApiBaseUrl,
+  parseJsonOrText,
+  resolveApiBaseUrl,
+  toHttpError,
+  toNetworkError,
+} from "./http";
 
-/**
- * Get the API base URL based on the environment
- * - Development (localhost): http://localhost:8000/backoffice/ui-components
- * - Production: https://api.brixel.ai/backoffice/ui-components
- */
-function getApiBaseUrl(): string {
-  // Check if running in development (localhost)
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return "http://localhost:8000/backoffice/ui-components";
-    }
-  }
-  return "https://api.brixel.ai/backoffice/ui-components";
-}
-
-/**
- * Execute a UI Task via the Brixel API
- *
- * This function allows UI Tasks to programmatically execute other UI Tasks.
- *
- * **API URL auto-detection:**
- * - Development (localhost): http://localhost:8000/backoffice/ui-components
- * - Production: https://api.brixel.ai/backoffice/ui-components
- * - Can be overridden via `apiBaseUrl` parameter
- *
- * **Authentication strategy (in order of priority):**
- * 1. **API Token from context** (RECOMMENDED): Passed via postMessage from parent
- *    - More secure and explicit
- *    - Parent has full control over the token
- * 2. **Cookies fallback**: Uses credentials: 'include' if no token provided
- *    - Works for same-domain scenarios (*.brixel.ai)
- *
- * @example
- * ```tsx
- * import { executeTask } from "@brixel/artifact-sdk";
- *
- * // Recommended: Use token from context (passed by parent via postMessage)
- * const result = await executeTask({
- *   taskUuid: "task-123-456",
- *   inputs: { name: "John", email: "john@example.com" },
- *   apiToken: context?.apiToken, // Token passed by parent
- * });
- *
- * // Or let the hook bind it automatically
- * const { executeTask } = useBrixelArtifact();
- * const result = await executeTask({
- *   taskUuid: "task-123-456",
- *   inputs: { name: "John", email: "john@example.com" },
- * });
- *
- * if (result.success) {
- *   console.debug("Task executed:", result.data);
- * } else {
- *   console.error("Error:", result.error);
- * }
- * ```
- *
- * @param params - Parameters for executing the task
- * @returns Promise with the execution result
- */
 export async function executeTask<TOutput = unknown>(
   params: ExecuteTaskParams
 ): Promise<ExecuteTaskResponse<TOutput>> {
-  const { taskUuid, inputs, conversationId, apiToken, apiBaseUrl } = params;
-
-  // Use custom API URL if provided, otherwise auto-detect
-  const baseUrl = apiBaseUrl || getApiBaseUrl();
-
-  // Log the API URL in development
-  if (
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-  ) {
-    console.debug("[Brixel SDK] Using API URL:", baseUrl);
-  }
+  const { organizationId, taskId, inputs, conversationId, apiToken, apiBaseUrl } = params;
+  const baseUrl = resolveApiBaseUrl(apiBaseUrl);
+  debugApiBaseUrl(baseUrl);
 
   try {
+    if (!organizationId) {
+      return {
+        success: false,
+        error: {
+          code: "MISSING_ORGANIZATION_ID",
+          message: "organizationId is required to execute a task",
+        },
+      };
+    }
+
+    if (!taskId) {
+      return {
+        success: false,
+        error: {
+          code: "MISSING_TASK_ID",
+          message: "taskId is required to execute a task",
+        },
+      };
+    }
+
     // Build headers
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -93,37 +50,22 @@ export async function executeTask<TOutput = unknown>(
       headers["x-conversation-id"] = conversationId;
     }
 
-    // Make API request
-    const response = await fetch(`${baseUrl}/execute_task`, {
-      method: "POST",
-      headers,
-      // Include cookies as fallback if no explicit token provided
-      credentials: apiToken ? "same-origin" : "include",
-      body: JSON.stringify({
-        task_uuid: taskUuid,
-        inputs,
-      }),
-    });
-
-    // Parse response (guard against empty or non-JSON bodies)
-    const responseText = await response.text();
-    let data: any = null;
-    if (responseText) {
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        data = { raw: responseText };
+    const orgIdEncoded = encodeURIComponent(organizationId);
+    const taskIdEncoded = encodeURIComponent(taskId);
+    const response = await fetch(
+      `${baseUrl}/v1/organizations/${orgIdEncoded}/tasks/${taskIdEncoded}/execute`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ inputs }),
       }
-    }
+    );
+    const data = await parseJsonOrText(response);
 
     if (!response.ok) {
       return {
         success: false,
-        error: {
-          code: data?.code || `HTTP_${response.status}`,
-          message: data?.message || `Request failed with status ${response.status}`,
-          details: data?.details || data,
-        },
+        error: toHttpError(response, data),
       };
     }
 
@@ -134,57 +76,27 @@ export async function executeTask<TOutput = unknown>(
   } catch (error) {
     return {
       success: false,
-      error: {
-        code: "NETWORK_ERROR",
-        message: error instanceof Error ? error.message : "Unknown error occurred",
-        details: error,
-      },
+      error: toNetworkError(error),
     };
   }
 }
 
-/**
- * Create an executeTask function bound to a specific context
- *
- * This is useful when you want to reuse the same auth context
- * for multiple task executions.
- *
- * @example
- * ```tsx
- * const { context } = useBrixelArtifact();
- * const boundExecuteTask = createExecuteTask({
- *   apiToken: context?.apiToken,
- *   conversationId: context?.conversationId
- * });
- *
- * // Now you can call it without passing auth each time
- * const result = await boundExecuteTask({
- *   taskUuid: "task-123",
- *   inputs: { foo: "bar" }
- * });
- * ```
- *
- * @example
- * ```tsx
- * // Or use the executeTask from the hook directly (recommended)
- * const { executeTask } = useBrixelArtifact();
- *
- * const result = await executeTask({
- *   taskUuid: "task-123",
- *   inputs: { foo: "bar" }
- * });
- * ```
- */
 export function createExecuteTask(contextAuth?: {
+  organizationId?: string;
   apiToken?: string;
   conversationId?: string;
   apiBaseUrl?: string;
 }) {
   return <TOutput = unknown>(
-    params: Omit<ExecuteTaskParams, "conversationId" | "apiToken" | "apiBaseUrl">
+    params: Omit<ExecuteTaskParams, "conversationId" | "apiToken" | "apiBaseUrl"> & {
+      organizationId?: string;
+    }
   ): Promise<ExecuteTaskResponse<TOutput>> => {
+    const { organizationId, ...restParams } = params;
+
     return executeTask<TOutput>({
-      ...params,
+      ...restParams,
+      organizationId: organizationId ?? contextAuth?.organizationId ?? "",
       apiToken: contextAuth?.apiToken,
       conversationId: contextAuth?.conversationId,
       apiBaseUrl: contextAuth?.apiBaseUrl,

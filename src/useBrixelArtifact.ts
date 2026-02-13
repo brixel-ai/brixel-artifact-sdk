@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   BrixelContext,
   HostToIframeMessage,
@@ -8,6 +8,8 @@ import type {
   UseBrixelTaskResult,
 } from "./types";
 import { createExecuteTask } from "./executeTask";
+import { createUploadFile } from "./uploadFile";
+import { createGetFileContent } from "./getFileContent";
 
 const SDK_VERSION = "1.0.0";
 
@@ -22,45 +24,16 @@ function isInIframe(): boolean {
   }
 }
 
-/**
- * Main hook for building Brixel UI Tasks
- *
- * @example
- * ```tsx
- * import { useBrixelArtifact } from "@brixel/artifact-sdk";
- *
- * interface Inputs {
- *   title: string;
- *   options: string[];
- * }
- *
- * interface Output {
- *   selectedOption: string;
- * }
- *
- * function MyUITask() {
- *   const { inputs, complete, cancel, context } = useBrixelArtifact<Inputs, Output>();
- *
- *   if (!inputs) return <div>Loading...</div>;
- *
- *   return (
- *     <div>
- *       <h1>{inputs.title}</h1>
- *       {inputs.options.map(opt => (
- *         <button key={opt} onClick={() => complete({ selectedOption: opt })}>
- *           {opt}
- *         </button>
- *       ))}
- *       <button onClick={() => cancel()}>Cancel</button>
- *     </div>
- *   );
- * }
- * ```
- */
 export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
   options: UseBrixelTaskOptions = {}
 ): UseBrixelTaskResult<TInputs, TOutput> {
-  const { targetOrigin = "*", onInputsUpdate, onDestroy, debug = false } = options;
+  const {
+    targetOrigin = "*",
+    onInputsUpdate,
+    onDestroy,
+    debug = false,
+    autoResize = false,
+  } = options;
 
   const [inputs, setInputs] = useState<TInputs | null>(null);
   const [context, setContext] = useState<BrixelContext | null>(null);
@@ -72,7 +45,6 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
   const parentWindow = useRef<Window | null>(null);
   const hasCompleted = useRef(false);
 
-  // Debug logger
   const debugLog = useCallback(
     (message: string, data?: unknown) => {
       if (debug) {
@@ -82,7 +54,6 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
     [debug]
   );
 
-  // Send message to parent window
   const postToParent = useCallback(
     (message: unknown) => {
       if (parentWindow.current) {
@@ -95,59 +66,41 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
     [targetOrigin, debugLog]
   );
 
-  // Complete the task with output
+  const completeTask = useCallback(
+    (type: "BRIXEL_COMPLETE" | "BRIXEL_CANCEL", payload: Record<string, unknown>) => {
+      if (hasCompleted.current) {
+        debugLog(`Already completed, ignoring ${type} call`);
+        return;
+      }
+
+      if (!runId) {
+        console.error(`[BrixelSDK] Cannot send ${type} - no runId`);
+        return;
+      }
+
+      hasCompleted.current = true;
+      setStatus(type === "BRIXEL_COMPLETE" ? "completed" : "cancelled");
+      postToParent({ type, payload: { runId, ...payload } });
+    },
+    [runId, postToParent, debugLog]
+  );
+
   const complete = useCallback(
     (output: TOutput) => {
-      if (hasCompleted.current) {
-        debugLog("Already completed, ignoring duplicate complete call");
-        return;
-      }
-
-      if (!runId) {
-        console.error("[BrixelSDK] Cannot complete - no runId");
-        return;
-      }
-
-      hasCompleted.current = true;
-      setStatus("completed");
-
-      postToParent({
-        type: "BRIXEL_COMPLETE",
-        payload: { runId, output },
-      });
-
+      completeTask("BRIXEL_COMPLETE", { output });
       debugLog("Task completed with output:", output);
     },
-    [runId, postToParent, debugLog]
+    [completeTask, debugLog]
   );
 
-  // Cancel the task
   const cancel = useCallback(
     (reason?: string) => {
-      if (hasCompleted.current) {
-        debugLog("Already completed, ignoring cancel call");
-        return;
-      }
-
-      if (!runId) {
-        console.error("[BrixelSDK] Cannot cancel - no runId");
-        return;
-      }
-
-      hasCompleted.current = true;
-      setStatus("cancelled");
-
-      postToParent({
-        type: "BRIXEL_CANCEL",
-        payload: { runId, reason },
-      });
-
+      completeTask("BRIXEL_CANCEL", { reason });
       debugLog("Task cancelled:", reason);
     },
-    [runId, postToParent, debugLog]
+    [completeTask, debugLog]
   );
 
-  // Request height change
   const setHeight = useCallback(
     (height: number | "auto") => {
       if (!runId) return;
@@ -162,7 +115,6 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
     [runId, postToParent, debugLog]
   );
 
-  // Send log to host
   const log = useCallback(
     (level: "debug" | "info" | "warn" | "error", message: string, data?: unknown) => {
       if (!runId) return;
@@ -175,9 +127,7 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
     [runId, postToParent]
   );
 
-  // Handle incoming messages from parent (or simulated in dev mode)
   useEffect(() => {
-    // Set parent window reference (use window itself in standalone mode for dev tools)
     parentWindow.current = isEmbedded.current ? window.parent : window;
 
     if (!isEmbedded.current) {
@@ -187,12 +137,10 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
     const handleMessage = (event: MessageEvent) => {
       const message = event.data as HostToIframeMessage<TInputs>;
 
-      // Validate message structure
       if (!message || typeof message !== "object" || !message.type) {
         return;
       }
 
-      // Only process Brixel messages
       if (!message.type.startsWith("BRIXEL_")) {
         return;
       }
@@ -247,7 +195,6 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
 
     window.addEventListener("message", handleMessage);
 
-    // Signal ready to receive INIT
     postToParent({
       type: "BRIXEL_READY",
       payload: { version: SDK_VERSION },
@@ -260,9 +207,8 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
     };
   }, [debugLog, postToParent, onInputsUpdate, onDestroy]);
 
-  // Auto-resize based on content (optional enhancement)
   useEffect(() => {
-    if (!runId || !isEmbedded.current) return;
+    if (!runId || !isEmbedded.current || !autoResize) return;
 
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -271,22 +217,43 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
       }
     });
 
-    // Observe document body for size changes
     resizeObserver.observe(document.body);
 
     return () => {
       resizeObserver.disconnect();
     };
-  }, [runId, setHeight]);
+  }, [runId, autoResize, setHeight]);
 
-  // Create executeTask bound to current context
-  const executeTask = useCallback(
-    createExecuteTask({
-      apiToken: context?.apiToken,
-      conversationId: context?.conversationId,
-      apiBaseUrl: context?.apiBaseUrl,
-    }),
-    [context?.apiToken, context?.conversationId, context?.apiBaseUrl]
+  const executeTask = useMemo(
+    () =>
+      createExecuteTask({
+        organizationId: context?.organizationId,
+        apiToken: context?.apiToken,
+        conversationId: context?.conversationId,
+        apiBaseUrl: context?.apiBaseUrl,
+      }),
+    [context?.organizationId, context?.apiToken, context?.conversationId, context?.apiBaseUrl]
+  );
+
+  const uploadFile = useMemo(
+    () =>
+      createUploadFile({
+        organizationId: context?.organizationId,
+        apiToken: context?.apiToken,
+        apiBaseUrl: context?.apiBaseUrl,
+      }),
+    [context?.organizationId, context?.apiToken, context?.apiBaseUrl]
+  );
+
+  const getFileContent = useMemo(
+    () =>
+      createGetFileContent({
+        organizationId: context?.organizationId,
+        conversationId: context?.conversationId,
+        apiToken: context?.apiToken,
+        apiBaseUrl: context?.apiBaseUrl,
+      }),
+    [context?.organizationId, context?.conversationId, context?.apiToken, context?.apiBaseUrl]
   );
 
   return {
@@ -301,5 +268,7 @@ export function useBrixelArtifact<TInputs = unknown, TOutput = unknown>(
     log,
     isEmbedded: isEmbedded.current,
     executeTask,
+    uploadFile,
+    getFileContent,
   };
 }

@@ -78,8 +78,15 @@ interface UseBrixelTaskOptions {
   onInputsUpdate?: (inputs) => void;  // Callback when inputs change
   onDestroy?: () => void;     // Callback before cleanup
   debug?: boolean;            // Enable debug logging
+  autoResize?: boolean;       // Auto-send BRIXEL_RESIZE based on content height (default: false)
 }
 ```
+
+### Full Parent Space vs `setHeight`
+
+If your SDK components must always fill the space allocated by the parent, keep `autoResize` disabled (default) and use CSS layout like `height: 100%` in your component root.
+
+Use `setHeight` (or `autoResize: true`) only when the iframe height must be content-driven.
 
 ## Development Mode
 
@@ -179,7 +186,7 @@ function MyUITask() {
 
   const handleExecuteTask = async () => {
     const result = await executeTask({
-      taskUuid: "78c2482f-b47d-461c-9fd0-509476687be9",
+      taskId: "78c2482f-b47d-461c-9fd0-509476687be9",
       inputs: { name: "value" },
     });
 
@@ -196,10 +203,7 @@ function MyUITask() {
 
 ### Authentication
 
-The `executeTask` function supports two authentication methods (in priority order):
-
-1. **API Token via postMessage** (RECOMMENDED): The parent interface passes the token via the INIT message
-2. **Cookies fallback**: Uses `credentials: 'include'` if no token provided
+The SDK uses Bearer token authentication. The parent interface should pass `apiToken` via the INIT message context.
 
 #### Passing Token from Parent
 
@@ -213,6 +217,7 @@ iframe.contentWindow.postMessage({
     runId: 'run-123',
     inputs: { /* ... */ },
     context: {
+      organizationId: 'org-123',
       apiToken: authToken,
       // ... other context fields
     }
@@ -227,7 +232,7 @@ const { executeTask, context } = useBrixelArtifact();
 
 // Token from context is automatically used
 await executeTask({
-  taskUuid: "task-uuid",
+  taskId: "task-uuid",
   inputs: {}
 });
 
@@ -237,15 +242,89 @@ await executeTask({
 
 The SDK automatically detects your environment and uses the appropriate API:
 
-- **Development** (localhost): `http://localhost:8000/backoffice/ui-components`
-- **Production**: `https://api.brixel.ai/backoffice/ui-components`
+- **Development** (localhost): `http://localhost:8000`
+- **Production**: `https://platform.brixel.ai`
 
 When running on localhost, you'll see:
 ```
-[Brixel SDK] Using API URL: http://localhost:8000/backoffice/ui-components
+[Brixel SDK] Using API URL: http://localhost:8000
 ```
 
 See [DEVELOPMENT.md](./DEVELOPMENT.md) for details on local development setup.
+
+## Uploading Files
+
+The SDK provides an `uploadFile` function to upload files to Brixel using:
+
+- Endpoint: `POST /v1/files/`
+- Form fields:
+  - `file`
+  - `visibility` (always forced to `"user"` by the SDK)
+- Header (optional): `X-Organization-Id`
+
+```tsx
+import { useBrixelArtifact } from "@brixel_ai/artifact-sdk";
+
+function MyUITask() {
+  const { uploadFile } = useBrixelArtifact();
+
+  const handleUpload = async (file: File) => {
+    const result = await uploadFile({
+      file,
+    });
+
+    if (!result.success) {
+      console.error("Upload error:", result.error);
+      return;
+    }
+
+    console.debug("Uploaded file:", result.data);
+  };
+
+  return <input type="file" onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />;
+}
+```
+
+## Getting File Content
+
+The SDK provides `getFileContent` to retrieve inline file content:
+
+- Endpoint: `GET /v1/files/{brixel_file_id}/content`
+- Headers (optional):
+  - `X-Organization-Id`
+  - `X-Conversation-Id`
+  - `If-None-Match`
+  - `If-Modified-Since`
+
+```tsx
+import { useBrixelArtifact } from "@brixel_ai/artifact-sdk";
+
+function MyUITask() {
+  const { getFileContent } = useBrixelArtifact();
+
+  const handlePreview = async (brixelFileId: string) => {
+    const result = await getFileContent({
+      brixelFileId,
+    });
+
+    if (!result.success) {
+      console.error("Get content error:", result.error);
+      return;
+    }
+
+    if (result.notModified) {
+      console.debug("File not modified");
+      return;
+    }
+
+    if (!result.data) return;
+    const url = URL.createObjectURL(result.data.blob);
+    console.debug("Preview URL:", url, "content-type:", result.data.contentType);
+  };
+
+  return <button onClick={() => handlePreview("your-brixel-file-id")}>Preview</button>;
+}
+```
 
 ## PostMessage Protocol
 

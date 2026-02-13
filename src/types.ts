@@ -244,8 +244,26 @@ export interface UseBrixelTaskResult<TInputs, TOutput> {
   isEmbedded: boolean;
   /** Execute another UI Task (bound to current context) */
   executeTask: <TTaskOutput = unknown>(
-    params: Omit<ExecuteTaskParams, "conversationId" | "apiToken" | "apiBaseUrl">
+    params: Omit<ExecuteTaskParams, "conversationId" | "apiToken" | "apiBaseUrl"> & {
+      organizationId?: string;
+    }
   ) => Promise<ExecuteTaskResponse<TTaskOutput>>;
+  /** Upload a file to Brixel (visibility is always forced to "user") */
+  uploadFile: <TFileOutput = InternalFilePublicOut>(
+    params: Omit<UploadFileParams, "organizationId" | "apiToken" | "apiBaseUrl"> & {
+      organizationId?: string;
+    }
+  ) => Promise<UploadFileResponse<TFileOutput>>;
+  /** Get inline content of a Brixel file by id */
+  getFileContent: <TContentOutput = FileContentData>(
+    params: Omit<
+      GetFileContentParams,
+      "organizationId" | "conversationId" | "apiToken" | "apiBaseUrl"
+    > & {
+      organizationId?: string;
+      conversationId?: string;
+    }
+  ) => Promise<GetFileContentResponse<TContentOutput>>;
 }
 
 export interface UseBrixelTaskOptions {
@@ -257,6 +275,8 @@ export interface UseBrixelTaskOptions {
   onDestroy?: () => void;
   /** Enable debug logging */
   debug?: boolean;
+  /** Auto-send BRIXEL_RESIZE based on document.body size changes */
+  autoResize?: boolean;
 }
 
 // ============================================================================
@@ -267,13 +287,15 @@ export interface UseBrixelTaskOptions {
  * Parameters for executing a UI Task via the API
  */
 export interface ExecuteTaskParams {
-  /** UUID of the task to execute */
-  taskUuid: string;
+  /** ID of the organization owning the task */
+  organizationId: string;
+  /** ID of the task to execute */
+  taskId: string;
   /** Input values for the task */
   inputs: Record<string, unknown>;
   /** Optional conversation ID for x-conversation-id header */
   conversationId?: string;
-  /** Optional API token (if not provided, uses credentials: 'include' as fallback) */
+  /** API token used as Bearer token for API requests */
   apiToken?: string;
   /** Optional custom API base URL (auto-detects dev/prod if not provided) */
   apiBaseUrl?: string;
@@ -284,6 +306,96 @@ export interface ExecuteTaskParams {
  */
 export interface ExecuteTaskResponse<TOutput = unknown> {
   success: boolean;
+  data?: TOutput;
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+/**
+ * Parameters for uploading a file to Brixel
+ */
+export interface UploadFileParams {
+  /** File to upload */
+  file: File;
+  /** Optional organization ID sent as X-Organization-Id header */
+  organizationId?: string;
+  /** API token used as Bearer token for API requests */
+  apiToken?: string;
+  /** Optional custom API base URL (auto-detects dev/prod if not provided) */
+  apiBaseUrl?: string;
+}
+
+/**
+ * Mime type returned by Brixel for internal files.
+ * Kept as `string` because backend enum values may evolve.
+ */
+export type InternalFileMimeType = string;
+
+/**
+ * Public schema for internal file output.
+ * Mirrors backend `InternalFilePublicOut`.
+ */
+export interface InternalFilePublicOut {
+  brixel_file_id: string;
+  name: string;
+  mime_type: InternalFileMimeType;
+  size: number;
+  expires_at: string | null;
+}
+
+/**
+ * Response from the upload file API
+ */
+export interface UploadFileResponse<TOutput = InternalFilePublicOut> {
+  success: boolean;
+  data?: TOutput;
+  error?: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+/**
+ * Returned file content payload
+ */
+export interface FileContentData {
+  blob: Blob;
+  contentType: string | null;
+  contentLength?: number;
+  etag?: string | null;
+  lastModified?: string | null;
+}
+
+/**
+ * Parameters for getting file content from Brixel
+ */
+export interface GetFileContentParams {
+  /** Brixel file id */
+  brixelFileId: string;
+  /** Optional organization ID sent as X-Organization-Id header */
+  organizationId?: string;
+  /** Optional conversation ID sent as X-Conversation-Id header */
+  conversationId?: string;
+  /** API token used as Bearer token for API requests */
+  apiToken?: string;
+  /** Optional custom API base URL (auto-detects dev/prod if not provided) */
+  apiBaseUrl?: string;
+  /** Optional conditional request header */
+  ifNoneMatch?: string;
+  /** Optional conditional request header */
+  ifModifiedSince?: string;
+}
+
+/**
+ * Response from the get file content API
+ */
+export interface GetFileContentResponse<TOutput = FileContentData> {
+  success: boolean;
+  notModified?: boolean;
   data?: TOutput;
   error?: {
     code: string;

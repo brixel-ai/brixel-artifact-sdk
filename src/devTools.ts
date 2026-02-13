@@ -121,6 +121,14 @@ export function createMockBrixelHost<TInputs = unknown, TOutput = unknown>(optio
   const { onReady, onComplete, onCancel, onResize, onLog, onError } = options;
 
   let currentRunId: string | null = null;
+  const postMessage = (message: unknown) => window.postMessage(message, "*");
+  const getRunIdOrWarn = (action: "update inputs" | "update theme" | "update locale") => {
+    if (!currentRunId) {
+      console.warn(`[MockHost] Cannot ${action} - no active run`);
+      return null;
+    }
+    return currentRunId;
+  };
 
   const handleMessage = (event: MessageEvent) => {
     const message = event.data;
@@ -155,74 +163,47 @@ export function createMockBrixelHost<TInputs = unknown, TOutput = unknown>(optio
   return {
     init(inputs: TInputs, runId = "mock-run-001", renderMode: RenderMode = "interaction") {
       currentRunId = runId;
-      window.postMessage(
-        {
-          type: "BRIXEL_INIT",
-          payload: {
-            runId,
-            inputs,
-            context: { ...mockContext, runId },
-            renderMode,
-          },
+      postMessage({
+        type: "BRIXEL_INIT",
+        payload: {
+          runId,
+          inputs,
+          context: { ...mockContext, runId },
+          renderMode,
         },
-        "*"
-      );
+      });
     },
 
     updateInputs(inputs: Partial<TInputs>) {
-      if (!currentRunId) {
-        console.warn("[MockHost] Cannot update inputs - no active run");
+      const runId = getRunIdOrWarn("update inputs");
+      if (!runId) {
         return;
       }
-      window.postMessage(
-        {
-          type: "BRIXEL_UPDATE_INPUTS",
-          payload: { runId: currentRunId, inputs },
-        },
-        "*"
-      );
+      postMessage({ type: "BRIXEL_UPDATE_INPUTS", payload: { runId, inputs } });
     },
 
     destroy() {
       if (currentRunId) {
-        window.postMessage(
-          {
-            type: "BRIXEL_DESTROY",
-            payload: { runId: currentRunId },
-          },
-          "*"
-        );
+        postMessage({ type: "BRIXEL_DESTROY", payload: { runId: currentRunId } });
       }
       window.removeEventListener("message", handleMessage);
       currentRunId = null;
     },
 
     updateTheme(theme: BrixelContext["theme"]) {
-      if (!currentRunId) {
-        console.warn("[MockHost] Cannot update theme - no active run");
+      const runId = getRunIdOrWarn("update theme");
+      if (!runId) {
         return;
       }
-      window.postMessage(
-        {
-          type: "BRIXEL_UPDATE_THEME",
-          payload: { runId: currentRunId, theme },
-        },
-        "*"
-      );
+      postMessage({ type: "BRIXEL_UPDATE_THEME", payload: { runId, theme } });
     },
 
     updateLocale(locale: string) {
-      if (!currentRunId) {
-        console.warn("[MockHost] Cannot update locale - no active run");
+      const runId = getRunIdOrWarn("update locale");
+      if (!runId) {
         return;
       }
-      window.postMessage(
-        {
-          type: "BRIXEL_UPDATE_LOCALE",
-          payload: { runId: currentRunId, locale },
-        },
-        "*"
-      );
+      postMessage({ type: "BRIXEL_UPDATE_LOCALE", payload: { runId, locale } });
     },
   };
 }
