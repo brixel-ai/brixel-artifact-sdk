@@ -104,24 +104,6 @@ if (import.meta.env.DEV) {
 }
 ```
 
-### Mock Host for Testing
-
-```tsx
-import { createMockBrixelHost } from "@brixel_ai/artifact-sdk";
-
-const host = createMockBrixelHost({
-  onComplete: (output) => console.debug("Completed:", output),
-  onCancel: (reason) => console.debug("Cancelled:", reason),
-  onResize: (height) => console.debug("Resize:", height),
-});
-
-// Send init
-host.init({ title: "Test" });
-
-// Later: cleanup
-host.destroy();
-```
-
 ## Render Modes
 
 ### Display Mode

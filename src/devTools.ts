@@ -7,19 +7,6 @@ import type { BrixelContext, RenderMode } from "./types";
  */
 
 /**
- * Default mock context for development
- */
-export const mockContext: BrixelContext = {
-  runId: "dev-run-001",
-  stepId: "dev-step-001",
-  userId: "dev-user-001",
-  organizationId: "dev-org-001",
-  theme: "light",
-  locale: "en-US",
-  conversationId: "dev-conversation-001",
-};
-
-/**
  * Simulate the Brixel host sending an INIT message
  *
  * @example
@@ -51,7 +38,7 @@ export function simulateBrixelInit<TInputs = unknown>(
     payload: {
       runId,
       inputs,
-      context: { ...mockContext, ...context, runId },
+      context: { ...context, runId },
       renderMode,
     },
   };
@@ -90,120 +77,5 @@ export function listenToUITaskMessages(
 
   return () => {
     window.removeEventListener("message", handleMessage);
-  };
-}
-
-/**
- * Create a mock Brixel host for development
- *
- * @example
- * ```tsx
- * const host = createMockBrixelHost({
- *   onComplete: (output) => console.debug("Completed:", output),
- *   onCancel: (reason) => console.debug("Cancelled:", reason),
- * });
- *
- * // Send init
- * host.init({ title: "Test" });
- *
- * // Cleanup
- * host.destroy();
- * ```
- */
-export function createMockBrixelHost<TInputs = unknown, TOutput = unknown>(options: {
-  onReady?: (version: string) => void;
-  onComplete?: (output: TOutput) => void;
-  onCancel?: (reason?: string) => void;
-  onResize?: (height: number | "auto") => void;
-  onLog?: (level: string, message: string, data?: unknown) => void;
-  onError?: (error: { code: string; message: string; details?: unknown }) => void;
-}) {
-  const { onReady, onComplete, onCancel, onResize, onLog, onError } = options;
-
-  let currentRunId: string | null = null;
-  const postMessage = (message: unknown) => window.postMessage(message, "*");
-  const getRunIdOrWarn = (action: "update inputs" | "update theme" | "update locale") => {
-    if (!currentRunId) {
-      console.warn(`[MockHost] Cannot ${action} - no active run`);
-      return null;
-    }
-    return currentRunId;
-  };
-
-  const handleMessage = (event: MessageEvent) => {
-    const message = event.data;
-    if (!message || typeof message !== "object" || !message.type?.startsWith("BRIXEL_")) {
-      return;
-    }
-
-    switch (message.type) {
-      case "BRIXEL_READY":
-        onReady?.(message.payload?.version);
-        break;
-      case "BRIXEL_COMPLETE":
-        onComplete?.(message.payload?.output);
-        break;
-      case "BRIXEL_CANCEL":
-        onCancel?.(message.payload?.reason);
-        break;
-      case "BRIXEL_RESIZE":
-        onResize?.(message.payload?.height);
-        break;
-      case "BRIXEL_LOG":
-        onLog?.(message.payload?.level, message.payload?.message, message.payload?.data);
-        break;
-      case "BRIXEL_ERROR":
-        onError?.(message.payload?.error);
-        break;
-    }
-  };
-
-  window.addEventListener("message", handleMessage);
-
-  return {
-    init(inputs: TInputs, runId = "mock-run-001", renderMode: RenderMode = "interaction") {
-      currentRunId = runId;
-      postMessage({
-        type: "BRIXEL_INIT",
-        payload: {
-          runId,
-          inputs,
-          context: { ...mockContext, runId },
-          renderMode,
-        },
-      });
-    },
-
-    updateInputs(inputs: Partial<TInputs>) {
-      const runId = getRunIdOrWarn("update inputs");
-      if (!runId) {
-        return;
-      }
-      postMessage({ type: "BRIXEL_UPDATE_INPUTS", payload: { runId, inputs } });
-    },
-
-    destroy() {
-      if (currentRunId) {
-        postMessage({ type: "BRIXEL_DESTROY", payload: { runId: currentRunId } });
-      }
-      window.removeEventListener("message", handleMessage);
-      currentRunId = null;
-    },
-
-    updateTheme(theme: BrixelContext["theme"]) {
-      const runId = getRunIdOrWarn("update theme");
-      if (!runId) {
-        return;
-      }
-      postMessage({ type: "BRIXEL_UPDATE_THEME", payload: { runId, theme } });
-    },
-
-    updateLocale(locale: string) {
-      const runId = getRunIdOrWarn("update locale");
-      if (!runId) {
-        return;
-      }
-      postMessage({ type: "BRIXEL_UPDATE_LOCALE", payload: { runId, locale } });
-    },
   };
 }

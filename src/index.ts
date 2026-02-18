@@ -38,6 +38,4 @@ export type {
 export {
   simulateBrixelInit,
   listenToUITaskMessages,
-  createMockBrixelHost,
-  mockContext,
 } from "./devTools";
