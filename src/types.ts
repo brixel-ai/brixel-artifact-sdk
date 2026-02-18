@@ -302,17 +302,20 @@ export interface ExecuteTaskParams {
 }
 
 /**
- * Response from the execute task API
+ * Error returned by executeTask when execution fails.
  */
-export interface ExecuteTaskResponse<TOutput = unknown> {
-  success: boolean;
-  data?: TOutput;
-  error?: {
-    code: string;
-    message: string;
-    details?: unknown;
-  };
+export interface ExecuteTaskError {
+  code: string;
+  message: string;
+  details?: unknown;
 }
+
+/**
+ * Return value from executeTask:
+ * - success: returns task result directly
+ * - failure: returns ExecuteTaskError
+ */
+export type ExecuteTaskResponse<TOutput = unknown> = TOutput | ExecuteTaskError;
 
 /**
  * Parameters for uploading a file to Brixel

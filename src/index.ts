@@ -1,6 +1,6 @@
 export { useBrixelArtifact } from "./useBrixelArtifact";
 
-export { executeTask, createExecuteTask } from "./executeTask";
+export { executeTask, createExecuteTask, isExecuteTaskError } from "./executeTask";
 export { uploadFile, createUploadFile } from "./uploadFile";
 export { getFileContent, createGetFileContent } from "./getFileContent";
 
@@ -25,6 +25,7 @@ export type {
   ErrorMessage,
   LogMessage,
   ExecuteTaskParams,
+  ExecuteTaskError,
   ExecuteTaskResponse,
   InternalFileMimeType,
   InternalFilePublicOut,
