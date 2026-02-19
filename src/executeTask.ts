@@ -138,7 +138,11 @@ function isBase64BytesPayload(value: unknown): value is Base64BytesPayload {
 function decodeBase64BytesPayloads(value: unknown): unknown {
   if (isBase64BytesPayload(value)) {
     try {
-      return decodeBase64ToUint8Array(value.content);
+      const { encoding: _encoding, ...payloadWithoutEncoding } = value;
+      return {
+        ...payloadWithoutEncoding,
+        content: decodeBase64ToUint8Array(value.content),
+      };
     } catch {
       return value;
     }
