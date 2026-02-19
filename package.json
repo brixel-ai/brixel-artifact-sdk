@@ -1,6 +1,6 @@
 {
   "name": "@brixel_ai/artifact-sdk",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "SDK for building Brixel Artifacts - interactive React components that integrate with Brixel workflows",
   "main": "dist/index.js",
   "module": "dist/index.mjs",

@@ -59,7 +59,8 @@ export async function executeTask<TOutput = unknown>(
         body: JSON.stringify({ inputs }),
       }
     );
-    const data = await parseJsonOrText(response);
+    const rawData = await parseJsonOrText(response);
+    const data = decodeBase64BytesPayloads(rawData);
 
     if (!response.ok) {
       return toExecuteTaskFailure(toHttpError(response, data));
@@ -110,8 +111,77 @@ interface ActionExecutePayload<TOutput = unknown> {
   result?: TOutput;
 }
 
+interface Base64BytesPayload {
+  type: "bytes";
+  encoding: "base64";
+  mime_type?: string;
+  name?: string;
+  content: string;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isBase64BytesPayload(value: unknown): value is Base64BytesPayload {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    value.type === "bytes" &&
+    value.encoding === "base64" &&
+    typeof value.content === "string"
+  );
+}
+
+function decodeBase64BytesPayloads(value: unknown): unknown {
+  if (isBase64BytesPayload(value)) {
+    try {
+      return decodeBase64ToUint8Array(value.content);
+    } catch {
+      return value;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => decodeBase64BytesPayloads(entry));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const transformed: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    transformed[key] = decodeBase64BytesPayloads(nestedValue);
+  }
+
+  return transformed;
+}
+
+function decodeBase64ToUint8Array(base64Value: string): Uint8Array {
+  const normalizedBase64 = base64Value.replace(/\s+/g, "");
+
+  if (typeof globalThis.atob === "function") {
+    const decoded = globalThis.atob(normalizedBase64);
+    const bytes = new Uint8Array(decoded.length);
+
+    for (let index = 0; index < decoded.length; index += 1) {
+      bytes[index] = decoded.charCodeAt(index);
+    }
+
+    return bytes;
+  }
+
+  const globalWithOptionalBuffer = globalThis as {
+    Buffer?: { from(input: string, encoding: string): Uint8Array };
+  };
+  if (globalWithOptionalBuffer.Buffer) {
+    return Uint8Array.from(globalWithOptionalBuffer.Buffer.from(normalizedBase64, "base64"));
+  }
+
+  throw new Error("No base64 decoder available in this environment");
 }
 
 function isActionExecutePayload<TOutput = unknown>(
