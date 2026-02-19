@@ -51,12 +51,13 @@ export async function executeTask<TOutput = unknown>(
 
     const orgIdEncoded = encodeURIComponent(organizationId);
     const taskIdEncoded = encodeURIComponent(taskId);
+    const encodedInputs = encodeUint8ArrayBytesPayloads(inputs);
     const response = await fetch(
       `${baseUrl}/v1/organizations/${orgIdEncoded}/tasks/${taskIdEncoded}/execute`,
       {
         method: "POST",
         headers,
-        body: JSON.stringify({ inputs }),
+        body: JSON.stringify({ inputs: encodedInputs }),
       }
     );
     const rawData = await parseJsonOrText(response);
@@ -119,8 +120,30 @@ interface Base64BytesPayload {
   content: string;
 }
 
+interface Uint8ArrayBytesPayload {
+  type: "bytes";
+  encoding?: string;
+  mime_type?: string;
+  name?: string;
+  content: Uint8Array;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function isUint8Array(value: unknown): value is Uint8Array {
+  return (
+    value instanceof Uint8Array || Object.prototype.toString.call(value) === "[object Uint8Array]"
+  );
+}
+
+function isUint8ArrayBytesPayload(value: unknown): value is Uint8ArrayBytesPayload {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return value.type === "bytes" && isUint8Array(value.content);
 }
 
 function isBase64BytesPayload(value: unknown): value is Base64BytesPayload {
@@ -133,6 +156,31 @@ function isBase64BytesPayload(value: unknown): value is Base64BytesPayload {
     value.encoding === "base64" &&
     typeof value.content === "string"
   );
+}
+
+function encodeUint8ArrayBytesPayloads(value: unknown): unknown {
+  if (isUint8ArrayBytesPayload(value)) {
+    return {
+      ...value,
+      encoding: "base64",
+      content: encodeUint8ArrayToBase64(value.content),
+    };
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => encodeUint8ArrayBytesPayloads(entry));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const transformed: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    transformed[key] = encodeUint8ArrayBytesPayloads(nestedValue);
+  }
+
+  return transformed;
 }
 
 function decodeBase64BytesPayloads(value: unknown): unknown {
@@ -162,6 +210,26 @@ function decodeBase64BytesPayloads(value: unknown): unknown {
   }
 
   return transformed;
+}
+
+function encodeUint8ArrayToBase64(bytesValue: Uint8Array): string {
+  if (typeof globalThis.btoa === "function") {
+    let binaryValue = "";
+    for (let index = 0; index < bytesValue.length; index += 1) {
+      binaryValue += String.fromCharCode(bytesValue[index]);
+    }
+
+    return globalThis.btoa(binaryValue);
+  }
+
+  const globalWithOptionalBuffer = globalThis as {
+    Buffer?: { from(input: Uint8Array): { toString(encoding: string): string } };
+  };
+  if (globalWithOptionalBuffer.Buffer) {
+    return globalWithOptionalBuffer.Buffer.from(bytesValue).toString("base64");
+  }
+
+  throw new Error("No base64 encoder available in this environment");
 }
 
 function decodeBase64ToUint8Array(base64Value: string): Uint8Array {
