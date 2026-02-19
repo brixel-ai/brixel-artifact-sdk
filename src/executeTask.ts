@@ -1,5 +1,6 @@
 import type {
   ExecuteTaskError,
+  ExecuteTaskFailureResponse,
   ExecuteTaskParams,
   ExecuteTaskResponse,
 } from "./types";
@@ -20,17 +21,17 @@ export async function executeTask<TOutput = unknown>(
 
   try {
     if (!organizationId) {
-      return {
+      return toExecuteTaskFailure({
         code: "MISSING_ORGANIZATION_ID",
         message: "organizationId is required to execute a task",
-      };
+      });
     }
 
     if (!taskId) {
-      return {
+      return toExecuteTaskFailure({
         code: "MISSING_TASK_ID",
         message: "taskId is required to execute a task",
-      };
+      });
     }
 
     // Build headers
@@ -61,22 +62,22 @@ export async function executeTask<TOutput = unknown>(
     const data = await parseJsonOrText(response);
 
     if (!response.ok) {
-      return toHttpError(response, data);
+      return toExecuteTaskFailure(toHttpError(response, data));
     }
 
     if (isActionExecutePayload<TOutput>(data)) {
       if (data.success === false) {
-        return toActionExecutionError(data);
+        return toExecuteTaskFailure(toActionExecutionError(data));
       }
 
       if ("result" in data) {
-        return data.result as TOutput;
+        return toExecuteTaskSuccess(data.result as TOutput);
       }
     }
 
-    return (data ?? undefined) as TOutput;
+    return toExecuteTaskSuccess((data ?? undefined) as TOutput);
   } catch (error) {
-    return toNetworkError(error);
+    return toExecuteTaskFailure(toNetworkError(error));
   }
 }
 
@@ -132,6 +133,34 @@ function toActionExecutionError(payload: ActionExecutePayload<unknown>): Execute
   };
 }
 
-export function isExecuteTaskError(value: unknown): value is ExecuteTaskError {
-  return isRecord(value) && typeof value.code === "string" && typeof value.message === "string";
+function toExecuteTaskSuccess<TOutput>(data: TOutput): ExecuteTaskResponse<TOutput> {
+  return {
+    success: true,
+    data,
+  };
+}
+
+function toExecuteTaskFailure(error: ExecuteTaskError): ExecuteTaskFailureResponse {
+  return {
+    success: false,
+    data: error,
+  };
+}
+
+export function isExecuteTaskError(
+  value: unknown
+): value is ExecuteTaskError | ExecuteTaskFailureResponse {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  if (typeof value.code === "string" && typeof value.message === "string") {
+    return true;
+  }
+
+  if (value.success !== false || !("data" in value) || !isRecord(value.data)) {
+    return false;
+  }
+
+  return typeof value.data.code === "string" && typeof value.data.message === "string";
 }

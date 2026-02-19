@@ -311,11 +311,27 @@ export interface ExecuteTaskError {
 }
 
 /**
- * Return value from executeTask:
- * - success: returns task result directly
- * - failure: returns ExecuteTaskError
+ * Successful executeTask response.
  */
-export type ExecuteTaskResponse<TOutput = unknown> = TOutput | ExecuteTaskError;
+export interface ExecuteTaskSuccessResponse<TOutput = unknown> {
+  success: true;
+  data: TOutput;
+}
+
+/**
+ * Failed executeTask response.
+ */
+export interface ExecuteTaskFailureResponse {
+  success: false;
+  data: ExecuteTaskError;
+}
+
+/**
+ * Return value from executeTask.
+ */
+export type ExecuteTaskResponse<TOutput = unknown> =
+  | ExecuteTaskSuccessResponse<TOutput>
+  | ExecuteTaskFailureResponse;
 
 /**
  * Parameters for uploading a file to Brixel

@@ -26,6 +26,8 @@ export type {
   LogMessage,
   ExecuteTaskParams,
   ExecuteTaskError,
+  ExecuteTaskSuccessResponse,
+  ExecuteTaskFailureResponse,
   ExecuteTaskResponse,
   InternalFileMimeType,
   InternalFilePublicOut,

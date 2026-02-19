@@ -157,28 +157,30 @@ interface BrixelContext {
 ## Executing Other UI Tasks
 
 The SDK allows UI Tasks to execute other UI Tasks programmatically using the `executeTask` function.
-On success, `executeTask` returns the action `result` directly. On failure, it returns an `ExecuteTaskError`.
+`executeTask` returns `{ success, data }`:
+- `success: true` => `data` is the task result
+- `success: false` => `data` is an `ExecuteTaskError`
 
 ### Basic Usage
 
 ```tsx
-import { isExecuteTaskError, useBrixelArtifact } from "@brixel_ai/artifact-sdk";
+import { useBrixelArtifact } from "@brixel_ai/artifact-sdk";
 
 function MyUITask() {
   const { executeTask } = useBrixelArtifact();
 
   const handleExecuteTask = async () => {
-    const result = await executeTask<{ message: string }>({
+    const response = await executeTask<{ message: string }>({
       taskId: "78c2482f-b47d-461c-9fd0-509476687be9",
       inputs: { name: "value" },
     });
 
-    if (isExecuteTaskError(result)) {
-      console.error("Error:", result);
+    if (!response.success) {
+      console.error("Error:", response.data);
       return;
     }
 
-    console.debug("Task executed:", result);
+    console.debug("Task executed:", response.data);
   };
 
   return <button onClick={handleExecuteTask}>Execute Task</button>;
